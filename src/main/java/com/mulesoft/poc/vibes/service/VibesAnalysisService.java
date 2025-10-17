@@ -74,11 +74,17 @@ public class VibesAnalysisService {
             .mapToLong(word -> countOccurrences(lowerText, word))
             .sum();
 
-        double score = (positiveCount - negativeCount) / (double) (lowerText.length() / 10.0 + 1);
-
-        if (score > 0.5) {
+        // Enhanced scoring algorithm
+        double baseScore = positiveCount - negativeCount;
+        
+        // If we have a clear majority of positive or negative words
+        if (positiveCount > 0 && negativeCount == 0) {
             return "positive";
-        } else if (score < -0.5) {
+        } else if (negativeCount > 0 && positiveCount == 0) {
+            return "negative";
+        } else if (positiveCount > negativeCount) {
+            return "positive";
+        } else if (negativeCount > positiveCount) {
             return "negative";
         } else {
             return "neutral";
