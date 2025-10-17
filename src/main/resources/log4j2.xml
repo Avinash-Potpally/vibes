@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+    <Appenders>
+        <!-- Console Appender -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%-5p %d [%t] [%c] %m%n"/>
+        </Console>
+        
+        <!-- File Appender -->
+        <RollingFile name="FileAppender" fileName="logs/vibes-poc.log"
+                     filePattern="logs/vibes-poc-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%-5p %d [%t] [%c] %m%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy />
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+    </Appenders>
+    
+    <Loggers>
+        <!-- Application specific loggers -->
+        <Logger name="com.mulesoft.poc" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="FileAppender"/>
+        </Logger>
+        
+        <!-- MuleSoft Runtime loggers -->
+        <Logger name="org.mule" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="FileAppender"/>
+        </Logger>
+        
+        <!-- HTTP Connector logging -->
+        <Logger name="org.mule.extension.http" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="FileAppender"/>
+        </Logger>
+        
+        <!-- Reduce verbose logging from unnecessary components -->
+        <Logger name="com.mulesoft.mule.runtime.plugin" level="WARN"/>
+        <Logger name="org.springframework" level="WARN"/>
+        <Logger name="org.apache" level="WARN"/>
+        
+        <!-- Root logger -->
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="FileAppender"/>
+        </Root>
+    </Loggers>
+</Configuration>
