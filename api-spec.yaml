@@ -1,0 +1,305 @@
+openapi: 3.0.0
+info:
+  title: MuleSoft Vibes POC API
+  description: A proof of concept API for sentiment analysis and music recommendations
+  version: 1.0.0
+  contact:
+    name: Vibes POC Team
+    email: support@vibes-poc.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8081/api
+    description: Local development server
+  - url: https://vibes-poc.cloudhub.io/api
+    description: CloudHub production server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the service
+      operationId: getHealth
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /vibes:
+    post:
+      summary: Analyze text vibes and sentiment
+      description: Analyzes the sentiment and emotional intensity of provided text
+      operationId: analyzeVibes
+      tags:
+        - Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VibesRequest'
+            examples:
+              positive:
+                summary: Positive text example
+                value:
+                  text: "I am feeling absolutely amazing and excited about today!"
+              negative:
+                summary: Negative text example
+                value:
+                  text: "This is a terrible and disappointing situation"
+              neutral:
+                summary: Neutral text example
+                value:
+                  text: "The weather is okay today"
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VibesResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /music:
+    get:
+      summary: Get popular music playlists
+      description: Returns a list of popular playlists for different moods
+      operationId: getPlaylists
+      tags:
+        - Music
+      responses:
+        '200':
+          description: Playlists retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistsResponse'
+
+    post:
+      summary: Generate custom music playlist
+      description: Creates a custom playlist based on mood and genre preferences
+      operationId: createCustomPlaylist
+      tags:
+        - Music
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomPlaylistRequest'
+            examples:
+              positive_pop:
+                summary: Positive pop playlist
+                value:
+                  mood: "positive"
+                  genre: "pop"
+              chill_ambient:
+                summary: Chill ambient playlist
+                value:
+                  mood: "neutral"
+                  genre: "ambient"
+      responses:
+        '200':
+          description: Custom playlist created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomPlaylistResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        service:
+          type: string
+          example: "vibes-poc"
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.0.0"
+      required:
+        - status
+        - service
+        - timestamp
+        - version
+
+    VibesRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Text to analyze for sentiment and vibes
+          minLength: 1
+          maxLength: 5000
+          example: "I am feeling great today!"
+      required:
+        - text
+
+    VibesResponse:
+      type: object
+      properties:
+        analysis:
+          type: object
+          properties:
+            text:
+              type: string
+            sentiment:
+              type: string
+              enum: [positive, negative, neutral]
+            vibeIntensity:
+              type: string
+              enum: [high, medium, low]
+            wordCount:
+              type: integer
+            characterCount:
+              type: integer
+            timestamp:
+              type: string
+              format: date-time
+            confidence:
+              type: string
+              enum: [high, medium, low]
+        recommendations:
+          type: object
+          properties:
+            musicGenre:
+              type: string
+              enum: [upbeat, mellow, ambient]
+            mood:
+              type: string
+              enum: [positive, negative, neutral]
+            suggestedActivity:
+              type: string
+              enum: [dancing, relaxation, meditation]
+
+    PlaylistsResponse:
+      type: object
+      properties:
+        playlists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Playlist'
+        totalPlaylists:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    Playlist:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        genre:
+          type: string
+        tracks:
+          type: array
+          items:
+            type: string
+        mood:
+          type: string
+        duration:
+          type: string
+
+    CustomPlaylistRequest:
+      type: object
+      properties:
+        mood:
+          type: string
+          enum: [positive, negative, neutral]
+          description: Desired mood for the playlist
+        genre:
+          type: string
+          description: Preferred music genre
+          example: "pop"
+      required:
+        - mood
+
+    CustomPlaylistResponse:
+      type: object
+      properties:
+        customPlaylist:
+          type: object
+          properties:
+            mood:
+              type: string
+            genre:
+              type: string
+            generatedAt:
+              type: string
+              format: date-time
+            tracks:
+              type: array
+              items:
+                type: string
+            estimatedDuration:
+              type: string
+            recommendations:
+              type: object
+              properties:
+                similar:
+                  type: array
+                  items:
+                    type: string
+                nextSuggestion:
+                  type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+            service:
+              type: string
+        supportInfo:
+          type: string
+      required:
+        - error
+
+tags:
+  - name: Monitoring
+    description: Health and monitoring endpoints
+  - name: Analysis
+    description: Text analysis and sentiment detection
+  - name: Music
+    description: Music recommendations and playlist generation

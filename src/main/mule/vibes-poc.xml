@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+      xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns="http://www.mulesoft.org/schema/mule/core" 
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+      http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+      http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- HTTP Listener Configuration -->
+    <http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" >
+        <http:listener-connection host="0.0.0.0" port="${http.port}" />
+    </http:listener-config>
+
+    <!-- HTTP Request Configuration for external APIs -->
+    <http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" >
+        <http:request-connection host="api.example.com" port="443" protocol="HTTPS" />
+    </http:request-config>
+
+    <!-- Main API Flow -->
+    <flow name="vibes-api-main" doc:id="main-flow">
+        <http:listener doc:name="HTTP Listener" config-ref="HTTP_Listener_config" path="/api/*" />
+        <choice doc:name="Route by Path">
+            <when expression="#[attributes.requestPath contains '/health']">
+                <flow-ref doc:name="Health Check Flow" name="health-check-flow"/>
+            </when>
+            <when expression="#[attributes.requestPath contains '/vibes']">
+                <flow-ref doc:name="Vibes Analysis Flow" name="vibes-analysis-flow"/>
+            </when>
+            <when expression="#[attributes.requestPath contains '/music']">
+                <flow-ref doc:name="Music Recommendation Flow" name="music-recommendation-flow"/>
+            </when>
+            <otherwise>
+                <set-payload value='{"error": "Endpoint not found", "availableEndpoints": ["/api/health", "/api/vibes", "/api/music"]}' doc:name="Set 404 Response" />
+                <set-variable value="404" variableName="httpStatus" doc:name="Set Status 404" />
+            </otherwise>
+        </choice>
+        <error-handler>
+            <on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" type="ANY">
+                <flow-ref doc:name="Error Handler Flow" name="error-handler-flow"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <!-- Health Check Flow -->
+    <flow name="health-check-flow" doc:id="health-check-flow">
+        <logger level="INFO" doc:name="Log Health Check" message="Health check endpoint accessed"/>
+        <set-payload value='{"status": "healthy", "service": "vibes-poc", "timestamp": "${now()}", "version": "1.0.0"}' doc:name="Health Response" />
+        <set-variable value="200" variableName="httpStatus" doc:name="Set Status 200" />
+    </flow>
+
+    <!-- Vibes Analysis Flow -->
+    <flow name="vibes-analysis-flow" doc:id="vibes-analysis-flow">
+        <logger level="INFO" doc:name="Log Vibes Request" message="Vibes analysis requested for: #[payload]"/>
+        
+        <!-- Validate input -->
+        <validation:is-not-null value="#[payload.text]" doc:name="Validate Text Input" message="Text input is required"/>
+        
+        <!-- Transform and analyze vibes -->
+        <ee:transform doc:name="Analyze Vibes">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var inputText = payload.text default ""
+var textLength = sizeOf(inputText)
+var positiveWords = ["happy", "joy", "love", "amazing", "great", "wonderful", "fantastic", "excellent", "awesome", "good"]
+var negativeWords = ["sad", "angry", "hate", "terrible", "awful", "horrible", "bad", "worst", "disappointed", "upset"]
+
+fun calculateSentiment(text) = do {
+    var lowerText = lower(text)
+    var positiveCount = positiveWords reduce ((word, acc = 0) -> 
+        acc + sizeOf(lowerText splitBy word) - 1
+    )
+    var negativeCount = negativeWords reduce ((word, acc = 0) -> 
+        acc + sizeOf(lowerText splitBy word) - 1
+    )
+    var score = (positiveCount - negativeCount) / (textLength / 10 + 1)
+    ---
+    if (score > 0.5) "positive"
+    else if (score < -0.5) "negative" 
+    else "neutral"
+}
+
+fun getVibeIntensity(text) = do {
+    var exclamationCount = sizeOf(text splitBy "!") - 1
+    var capsCount = sizeOf(text filter ((char) -> char >= "A" and char <= "Z"))
+    var intensity = (exclamationCount * 2 + capsCount / textLength * 10)
+    ---
+    if (intensity > 5) "high"
+    else if (intensity > 2) "medium"
+    else "low"
+}
+---
+{
+    "analysis": {
+        "text": inputText,
+        "sentiment": calculateSentiment(inputText),
+        "vibeIntensity": getVibeIntensity(inputText),
+        "wordCount": sizeOf(inputText splitBy " "),
+        "characterCount": textLength,
+        "timestamp": now(),
+        "confidence": if (textLength > 50) "high" else if (textLength > 20) "medium" else "low"
+    },
+    "recommendations": {
+        "musicGenre": if (calculateSentiment(inputText) == "positive") "upbeat" 
+                     else if (calculateSentiment(inputText) == "negative") "mellow"
+                     else "ambient",
+        "mood": calculateSentiment(inputText),
+        "suggestedActivity": if (calculateSentiment(inputText) == "positive") "dancing" 
+                           else if (calculateSentiment(inputText) == "negative") "relaxation"
+                           else "meditation"
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        
+        <set-variable value="200" variableName="httpStatus" doc:name="Set Status 200" />
+        <logger level="INFO" doc:name="Log Analysis Result" message="Vibes analysis completed: #[payload.analysis.sentiment]"/>
+    </flow>
+
+    <!-- Music Recommendation Flow -->
+    <flow name="music-recommendation-flow" doc:id="music-recommendation-flow">
+        <logger level="INFO" doc:name="Log Music Request" message="Music recommendation requested"/>
+        
+        <choice doc:name="Check HTTP Method">
+            <when expression="#[attributes.method == 'GET']">
+                <ee:transform doc:name="Get Popular Playlists">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "playlists": [
+        {
+            "id": "1",
+            "name": "Positive Vibes",
+            "genre": "upbeat",
+            "tracks": [
+                "Happy - Pharrell Williams",
+                "Can't Stop the Feeling - Justin Timberlake",
+                "Good as Hell - Lizzo"
+            ],
+            "mood": "positive",
+            "duration": "45 minutes"
+        },
+        {
+            "id": "2", 
+            "name": "Chill Vibes",
+            "genre": "mellow",
+            "tracks": [
+                "Weightless - Marconi Union",
+                "Clair de Lune - Debussy",
+                "Mad World - Gary Jules"
+            ],
+            "mood": "neutral",
+            "duration": "38 minutes"
+        },
+        {
+            "id": "3",
+            "name": "Energy Boost",
+            "genre": "energetic",
+            "tracks": [
+                "Thunder - Imagine Dragons",
+                "Uptown Funk - Mark Ronson ft. Bruno Mars",
+                "I Gotta Feeling - Black Eyed Peas"
+            ],
+            "mood": "positive",
+            "duration": "42 minutes"
+        }
+    ],
+    "totalPlaylists": 3,
+    "timestamp": now()
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <when expression="#[attributes.method == 'POST']">
+                <validation:is-not-null value="#[payload.mood]" doc:name="Validate Mood Input" message="Mood parameter is required"/>
+                <ee:transform doc:name="Generate Custom Playlist">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var requestedMood = payload.mood default "neutral"
+var genre = payload.genre default "mixed"
+---
+{
+    "customPlaylist": {
+        "mood": requestedMood,
+        "genre": genre,
+        "generatedAt": now(),
+        "tracks": if (requestedMood == "positive") [
+                    "Good Vibes - Dua Lipa",
+                    "Sunshine - Matisyahu", 
+                    "Walking on Sunshine - Katrina and the Waves"
+                  ] else if (requestedMood == "negative") [
+                    "Hurt - Johnny Cash",
+                    "Black - Pearl Jam",
+                    "Mad World - Tears for Fears"
+                  ] else [
+                    "Breathe Me - Sia",
+                    "The Sound of Silence - Simon & Garfunkel",
+                    "Hallelujah - Jeff Buckley"
+                  ],
+        "estimatedDuration": "35 minutes",
+        "recommendations": {
+            "similar": ["More " ++ requestedMood ++ " vibes", "Curated " ++ genre ++ " selection"],
+            "nextSuggestion": if (requestedMood == "positive") "energetic" else "uplifting"
+        }
+    }
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <set-payload value='{"error": "Method not allowed", "allowedMethods": ["GET", "POST"]}' doc:name="Method Not Allowed" />
+                <set-variable value="405" variableName="httpStatus" doc:name="Set Status 405" />
+            </otherwise>
+        </choice>
+        
+        <set-variable value="200" variableName="httpStatus" doc:name="Set Status 200" />
+        <logger level="INFO" doc:name="Log Music Response" message="Music recommendation provided"/>
+    </flow>
+
+    <!-- Error Handler Flow -->
+    <flow name="error-handler-flow" doc:id="error-handler-flow">
+        <logger level="ERROR" doc:name="Log Error" message="Error occurred: #[error.description]"/>
+        <ee:transform doc:name="Error Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "error": {
+        "message": error.description default "An unexpected error occurred",
+        "type": error.errorType.identifier default "UNKNOWN",
+        "timestamp": now(),
+        "service": "vibes-poc"
+    },
+    "supportInfo": "Please check your request format and try again"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <set-variable value="500" variableName="httpStatus" doc:name="Set Status 500" />
+    </flow>
+
+</mule>

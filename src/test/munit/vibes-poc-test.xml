@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <munit:config name="vibes-poc-test.xml" />
+
+    <!-- Test for Health Check Endpoint -->
+    <munit:test name="health-check-test" description="Test health check endpoint returns 200">
+        <munit:execution>
+            <flow-ref name="health-check-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload]" is="#[MunitTools::containsString('healthy')]"/>
+            <munit-tools:assert-equals actual="#[vars.httpStatus]" expected="200"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Test for Vibes Analysis with Positive Text -->
+    <munit:test name="vibes-analysis-positive-test" description="Test vibes analysis with positive text">
+        <munit:execution>
+            <set-payload value='{"text": "I am so happy and excited about this amazing day!"}' />
+            <flow-ref name="vibes-analysis-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.analysis.sentiment]" is="#[MunitTools::equalTo('positive')]"/>
+            <munit-tools:assert-that expression="#[payload.recommendations.musicGenre]" is="#[MunitTools::equalTo('upbeat')]"/>
+            <munit-tools:assert-equals actual="#[vars.httpStatus]" expected="200"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Test for Vibes Analysis with Negative Text -->
+    <munit:test name="vibes-analysis-negative-test" description="Test vibes analysis with negative text">
+        <munit:execution>
+            <set-payload value='{"text": "I am feeling terrible and sad about this awful situation"}' />
+            <flow-ref name="vibes-analysis-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.analysis.sentiment]" is="#[MunitTools::equalTo('negative')]"/>
+            <munit-tools:assert-that expression="#[payload.recommendations.musicGenre]" is="#[MunitTools::equalTo('mellow')]"/>
+            <munit-tools:assert-equals actual="#[vars.httpStatus]" expected="200"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Test for Music Recommendation Flow -->
+    <munit:test name="music-recommendation-get-test" description="Test GET request to music recommendation endpoint">
+        <munit:execution>
+            <set-attributes value="#[{method: 'GET'}]"/>
+            <flow-ref name="music-recommendation-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.playlists]" is="#[MunitTools::notNullValue()]"/>
+            <munit-tools:assert-that expression="#[sizeOf(payload.playlists)]" is="#[MunitTools::greaterThan(0)]"/>
+            <munit-tools:assert-equals actual="#[vars.httpStatus]" expected="200"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Test for Music Recommendation POST with Custom Mood -->
+    <munit:test name="music-recommendation-post-test" description="Test POST request to music recommendation with custom mood">
+        <munit:execution>
+            <set-attributes value="#[{method: 'POST'}]"/>
+            <set-payload value='{"mood": "positive", "genre": "pop"}' />
+            <flow-ref name="music-recommendation-flow"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.customPlaylist.mood]" is="#[MunitTools::equalTo('positive')]"/>
+            <munit-tools:assert-that expression="#[payload.customPlaylist.genre]" is="#[MunitTools::equalTo('pop')]"/>
+            <munit-tools:assert-equals actual="#[vars.httpStatus]" expected="200"/>
+        </munit:validation>
+    </munit:test>
+
+</mule>
